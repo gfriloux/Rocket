@@ -109,7 +109,7 @@ impl<T: DeserializeOwned> FromData for Json<T> {
 /// fails, an `Err` of `Status::InternalServerError` is returned.
 impl<T: Serialize> Responder<'static> for Json<T> {
     fn respond_to(self, req: &Request) -> response::Result<'static> {
-        serde_json::to_string(&self.0).map(|string| {
+        serde_json::to_string_pretty(&self.0).map(|string| {
             content::Json(string).respond_to(req).unwrap()
         }).map_err(|e| {
             error_!("JSON failed to serialize: {:?}", e);
