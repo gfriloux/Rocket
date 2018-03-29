@@ -53,15 +53,15 @@ project by ensuring your `Cargo.toml` contains the following:
 
 ```
 [dependencies]
-rocket = "0.4.0-dev"
-rocket_codegen = "0.4.0-dev"
+rocket = "0.3.6"
+rocket_codegen = "0.3.6"
 ```
 
 Modify `src/main.rs` so that it contains the code for the Rocket `Hello, world!`
 program, reproduced below:
 
 ```rust
-#![feature(plugin, decl_macro)]
+#![feature(plugin)]
 #![plugin(rocket_codegen)]
 
 extern crate rocket;

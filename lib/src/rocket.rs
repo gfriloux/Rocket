@@ -1,14 +1,16 @@
 use std::collections::HashMap;
-use std::str::from_utf8_unchecked;
+use std::str::from_utf8;
 use std::cmp::min;
-use std::net::SocketAddr;
 use std::io::{self, Write};
+use std::time::Duration;
 use std::mem;
 
 use yansi::Paint;
 use state::Container;
 
-#[cfg(feature = "tls")] use hyper_sync_rustls::TlsServer;
+#[cfg(feature = "tls")]
+use hyper_sync_rustls::TlsServer;
+
 use {logger, handler};
 use ext::ReadExt;
 use config::{self, Config, LoggedValue};
@@ -58,7 +60,7 @@ impl hyper::Handler for Rocket {
             Err(e) => {
                 error!("Bad incoming request: {}", e);
                 let dummy = Request::new(self, Method::Get, Uri::new("<unknown>"));
-                let r = self.handle_error(Status::InternalServerError, &dummy);
+                let r = self.handle_error(Status::BadRequest, &dummy);
                 return self.issue_response(r, res);
             }
         };
@@ -132,11 +134,6 @@ impl Rocket {
             hyp_res.headers_mut().append_raw(name, value);
         }
 
-        if response.body().is_none() {
-            hyp_res.headers_mut().set(header::ContentLength(0));
-            return hyp_res.start()?.end();
-        }
-
         match response.body() {
             None => {
                 hyp_res.headers_mut().set(header::ContentLength(0));
@@ -173,42 +170,24 @@ impl Rocket {
     /// Preprocess the request for Rocket things. Currently, this means:
     ///
     ///   * Rewriting the method in the request if _method form field exists.
-    ///   * Rewriting the remote IP if the 'X-Real-IP' header is set.
     ///
     /// Keep this in-sync with derive_form when preprocessing form fields.
     fn preprocess_request(&self, req: &mut Request, data: &Data) {
-        // Rewrite the remote IP address. The request must already have an
-        // address associated with it to do this since we need to know the port.
-        if let Some(current) = req.remote() {
-            let ip = req.headers()
-                .get_one("X-Real-IP")
-                .and_then(|ip| {
-                    ip.parse()
-                        .map_err(|_| warn_!("'X-Real-IP' header is malformed: {}", ip))
-                        .ok()
-                });
-
-            if let Some(ip) = ip {
-                req.set_remote(SocketAddr::new(ip, current.port()));
-            }
-        }
-
         // Check if this is a form and if the form contains the special _method
         // field which we use to reinterpret the request's method.
         let data_len = data.peek().len();
         let (min_len, max_len) = ("_method=get".len(), "_method=delete".len());
         let is_form = req.content_type().map_or(false, |ct| ct.is_form());
-        if is_form && req.method() == Method::Post && data_len >= min_len {
-            // We're only using this for comparison and throwing it away
-            // afterwards, so it doesn't matter if we have invalid UTF8.
-            let form =
-                unsafe { from_utf8_unchecked(&data.peek()[..min(data_len, max_len)]) };
 
-            if let Some((key, value)) = FormItems::from(form).next() {
-                if key == "_method" {
-                    if let Ok(method) = value.parse() {
-                        req.set_method(method);
-                    }
+        if is_form && req.method() == Method::Post && data_len >= min_len {
+            if let Ok(form) = from_utf8(&data.peek()[..min(data_len, max_len)]) {
+                let method: Option<Result<Method, _>> = FormItems::from(form)
+                    .filter(|&(key, _)| key.as_str() == "_method")
+                    .map(|(_, value)| value.parse())
+                    .next();
+
+                if let Some(Ok(method)) = method {
+                    req.set_method(method);
                 }
             }
         }
@@ -245,7 +224,7 @@ impl Rocket {
                 let request: &'r mut Request<'s> =
                     unsafe { (&mut *(request as *const _ as *mut _)) };
 
-                // There was no matching route.
+                // There was no matching route. Autohandle `HEAD` requests.
                 if request.method() == Method::Head {
                     info_!("Autohandling {} request.", Paint::white("HEAD"));
                     request.set_method(Method::Get);
@@ -258,6 +237,11 @@ impl Rocket {
             }
             Outcome::Failure(status) => self.handle_error(status, request),
         };
+
+        // Strip the body if this is a `HEAD` request.
+        if request.method() == Method::Head {
+            response.strip_body();
+        }
 
         // Add the 'rocket' server header to the response and run fairings.
         // TODO: If removing Hyper, write out `Date` header too.
@@ -307,8 +291,8 @@ impl Rocket {
         Outcome::Forward(data)
     }
 
-    // Finds the error catcher for the status `status` and executes it fo the
-    // given request `req`. If a user has registere a catcher for `status`, the
+    // Finds the error catcher for the status `status` and executes it for the
+    // given request `req`. If a user has registers a catcher for `status`, the
     // catcher is called. If the catcher fails to return a good response, the
     // 500 catcher is executed. if there is no registered catcher for `status`,
     // the default catcher is used.
@@ -390,25 +374,32 @@ impl Rocket {
     #[inline]
     fn configured(config: Config, log: bool) -> Rocket {
         if log {
+            // Initialize logger. Temporary weaken log level for launch info.
             logger::try_init(config.log_level, false);
+            logger::push_max_level(logger::LoggingLevel::Normal);
         }
 
-        info!("{}Configured for {}.", Paint::masked("🔧  "), config.environment);
-        info_!("address: {}", Paint::white(&config.address));
-        info_!("port: {}", Paint::white(&config.port));
-        info_!("log: {}", Paint::white(config.log_level));
-        info_!("workers: {}", Paint::white(config.workers));
-        info_!("secret key: {}", Paint::white(&config.secret_key));
-        info_!("limits: {}", Paint::white(&config.limits));
+        launch_info!("{}Configured for {}.", Paint::masked("🔧  "), config.environment);
+        launch_info_!("address: {}", Paint::white(&config.address));
+        launch_info_!("port: {}", Paint::white(&config.port));
+        launch_info_!("log: {}", Paint::white(config.log_level));
+        launch_info_!("workers: {}", Paint::white(config.workers));
+        launch_info_!("secret key: {}", Paint::white(&config.secret_key));
+        launch_info_!("limits: {}", Paint::white(&config.limits));
+
+        match config.keep_alive {
+            Some(v) => launch_info_!("keep-alive: {}", Paint::white(format!("{}s", v))),
+            None => launch_info_!("keep-alive: {}", Paint::white("disabled")),
+        }
 
         let tls_configured = config.tls.is_some();
         if tls_configured && cfg!(feature = "tls") {
-            info_!("tls: {}", Paint::white("enabled"));
+            launch_info_!("tls: {}", Paint::white("enabled"));
         } else if tls_configured {
             error_!("tls: {}", Paint::white("disabled"));
             error_!("tls is configured, but the tls feature is disabled");
         } else {
-            info_!("tls: {}", Paint::white("disabled"));
+            launch_info_!("tls: {}", Paint::white("disabled"));
         }
 
         if config.secret_key.is_generated() && config.environment.is_prod() {
@@ -416,10 +407,10 @@ impl Rocket {
         }
 
         for (name, value) in config.extras() {
-            info_!("{} {}: {}",
-                   Paint::yellow("[extra]"),
-                   Paint::blue(name),
-                   Paint::white(LoggedValue(value)));
+            launch_info_!("{} {}: {}",
+                          Paint::yellow("[extra]"),
+                          Paint::blue(name),
+                          Paint::white(LoggedValue(value)));
         }
 
         Rocket {
@@ -625,11 +616,12 @@ impl Rocket {
     /// ```
     #[inline]
     pub fn attach<F: Fairing>(mut self, fairing: F) -> Self {
-        // Attach the fairings, which requires us to move `self`.
+        // Attach (and run attach) fairings, which requires us to move `self`.
         let mut fairings = mem::replace(&mut self.fairings, Fairings::new());
         self = fairings.attach(Box::new(fairing), self);
 
-        // Make sure we keep the fairings around!
+        // Make sure we keep all fairings around: the old and newly added ones!
+        fairings.append(self.fairings);
         self.fairings = fairings;
         self
     }
@@ -639,8 +631,8 @@ impl Rocket {
         if !collisions.is_empty() {
             let owned = collisions.iter().map(|&(a, b)| (a.clone(), b.clone()));
             Some(LaunchError::from(LaunchErrorKind::Collision(owned.collect())))
-        } else if self.fairings.had_failure() {
-            Some(LaunchError::from(LaunchErrorKind::FailedFairing))
+        } else if let Some(failures) = self.fairings.failures() {
+            Some(LaunchError::from(LaunchErrorKind::FailedFairings(failures.to_vec())))
         } else {
             None
         }
@@ -686,6 +678,10 @@ impl Rocket {
                 Err(e) => return LaunchError::from(e),
             }
 
+            // Set the keep-alive.
+            let timeout = self.config.keep_alive.map(|s| Duration::from_secs(s as u64));
+            server.keep_alive(timeout);
+
             // Run the launch fairings.
             self.fairings.handle_launch(&self);
 
@@ -695,6 +691,9 @@ impl Rocket {
                          Paint::white("Rocket has launched from"),
                          Paint::white(proto).bold(),
                          Paint::white(&full_addr).bold());
+
+            // Restore the log level back to what it originally was.
+            logger::pop_max_level();
 
             let threads = self.config.workers as usize;
             if let Err(e) = server.handle_threads(self, threads) {
@@ -741,6 +740,26 @@ impl Rocket {
     #[inline(always)]
     pub fn routes<'a>(&'a self) -> impl Iterator<Item = &'a Route> + 'a {
         self.router.routes()
+    }
+
+    /// Returns `Some` of the managed state value for the type `T` if it is
+    /// being managed by `self`. Otherwise, returns `None`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// #[derive(PartialEq, Debug)]
+    /// struct MyState(&'static str);
+    ///
+    /// let rocket = rocket::ignite().manage(MyState("hello!"));
+    /// assert_eq!(rocket.state::<MyState>(), Some(&MyState("hello!")));
+    ///
+    /// let client = rocket::local::Client::new(rocket).expect("valid rocket");
+    /// assert_eq!(client.rocket().state::<MyState>(), Some(&MyState("hello!")));
+    /// ```
+    #[inline(always)]
+    pub fn state<T: Send + Sync + 'static>(&self) -> Option<&T> {
+        self.state.try_get()
     }
 
     /// Returns the active configuration.

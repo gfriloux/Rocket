@@ -72,7 +72,7 @@ fn state(hit_count: State<HitCount>, config: State<Config>) -> T { ... }
 ### Within Guards
 
 It can also be useful to retrieve managed state from a `FromRequest`
-implementation. To do so, simple invoke `State<T>` as a guard using the
+implementation. To do so, simply invoke `State<T>` as a guard using the
 [`Request::guard()`] method.
 
 ```rust
@@ -166,7 +166,7 @@ fn handler(conn: DbConn) { ... }
 ```
 
 [`diesel`]: http://diesel.rs/
-[`r2d2`]: https://docs.rs/r2d2/0.7.2/r2d2/
+[`r2d2`]: https://docs.rs/r2d2/
 
 ### Dependencies
 
@@ -178,22 +178,16 @@ use the following dependencies:
 ```
 [dependencies]
 rocket = "0.4.0-dev"
-diesel = { version = "*", features = ["sqlite"] }
-diesel_codegen = { version = "*", features = ["sqlite"] }
-r2d2-diesel = "*"
-r2d2 = "*"
+rocket_codegen = "0.4.0-dev"
+diesel = { version = "1.1", features = ["sqlite", "r2d2"] }
 ```
 
-Your `diesel` dependency information will differ. In particular, you should
-specify the latest versions of these libraries as opposed to using a `*`. The
-crates are imported as well:
+Your `diesel` dependency information may differ. The crates are imported as
+well:
 
 ```rust
 extern crate rocket;
 #[macro_use] extern crate diesel;
-#[macro_use] extern crate diesel_codegen;
-extern crate r2d2_diesel;
-extern crate r2d2;
 ```
 
 ### Managed Pool
@@ -209,19 +203,18 @@ default configuration parameters and a Diesel `SqliteConnection`
 
 ```rust
 use diesel::sqlite::SqliteConnection;
-use r2d2_diesel::ConnectionManager;
+use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 
 // An alias to the type for a pool of Diesel SQLite connections.
-type Pool = r2d2::Pool<ConnectionManager<SqliteConnection>>;
+type SqlitePool = Pool<ConnectionManager<SqliteConnection>>;
 
 // The URL to the database, set via the `DATABASE_URL` environment variable.
 static DATABASE_URL: &'static str = env!("DATABASE_URL");
 
 /// Initializes a database pool.
 fn init_pool() -> Pool {
-    let config = r2d2::Config::default();
     let manager = ConnectionManager::<SqliteConnection>::new(DATABASE_URL);
-    r2d2::Pool::new(config, manager).expect("db pool")
+    Pool::new(manager).expect("db pool")
 }
 ```
 
@@ -249,9 +242,10 @@ use std::ops::Deref;
 use rocket::http::Status;
 use rocket::request::{self, FromRequest};
 use rocket::{Request, State, Outcome};
+use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 
 // Connection request guard type: a wrapper around an r2d2 pooled connection.
-pub struct DbConn(pub r2d2::PooledConnection<ConnectionManager<SqliteConnection>>);
+pub struct DbConn(pub PooledConnection<ConnectionManager<SqliteConnection>>);
 
 /// Attempts to retrieve a single connection from the managed database pool. If
 /// no pool is currently managed, fails with an `InternalServerError` status. If
@@ -259,8 +253,8 @@ pub struct DbConn(pub r2d2::PooledConnection<ConnectionManager<SqliteConnection>
 impl<'a, 'r> FromRequest<'a, 'r> for DbConn {
     type Error = ();
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<DbConn, ()> {
-        let pool = request.guard::<State<Pool>>()?;
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
+        let pool = request.guard::<State<SqlitePool>>()?;
         match pool.get() {
             Ok(conn) => Outcome::Success(DbConn(conn)),
             Err(_) => Outcome::Failure((Status::ServiceUnavailable, ()))

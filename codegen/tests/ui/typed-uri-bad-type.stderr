@@ -30,3 +30,4 @@ error[E0277]: the trait bound `S: rocket::http::uri::FromUriParam<_>` is not sat
 
 error: aborting due to 4 previous errors
 
+For more information about this error, try `rustc --explain E0277`.

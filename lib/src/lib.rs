@@ -4,6 +4,7 @@
 #![feature(plugin, decl_macro)]
 #![feature(never_type)]
 #![feature(try_trait)]
+#![recursion_limit="256"]
 
 #![plugin(pear_codegen)]
 
@@ -112,12 +113,13 @@ extern crate time;
 extern crate memchr;
 extern crate base64;
 extern crate smallvec;
-extern crate ordermap;
+extern crate indexmap;
 extern crate isatty;
 
 #[cfg(test)] #[macro_use] extern crate lazy_static;
 
 #[doc(hidden)] #[macro_use] pub mod logger;
+#[macro_use] mod docify;
 pub mod local;
 pub mod http;
 pub mod request;

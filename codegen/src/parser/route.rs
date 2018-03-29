@@ -164,8 +164,9 @@ pub fn param_to_ident(ecx: &ExtCtxt, s: Spanned<&str>) -> Option<Spanned<Ident>>
 }
 
 fn parse_method(ecx: &ExtCtxt, meta_item: &NestedMetaItem) -> Spanned<Method> {
-    let valid_methods = "valid methods are: `GET`, `PUT`, `POST`, `DELETE`, `PATCH`";
     let default_method = dummy_spanned(Method::Get);
+    let valid_methods = "valid methods are: `GET`, `PUT`, `POST`, `DELETE`, \
+        `HEAD`, `PATCH`, `OPTIONS`";
 
     if let Some(word) = meta_item.word() {
         if let Ok(method) = Method::from_str(&word.name().as_str()) {
@@ -257,7 +258,7 @@ fn parse_rank(ecx: &ExtCtxt, kv: &KVSpanned<LitKind>) -> isize {
 
 fn parse_format(ecx: &ExtCtxt, kv: &KVSpanned<LitKind>) -> MediaType {
     if let LitKind::Str(ref s, _) = *kv.value() {
-        if let Ok(ct) = MediaType::from_str(&s.as_str()) {
+        if let Some(ct) = MediaType::parse_flexible(&s.as_str()) {
             if !ct.is_known() {
                 let msg = format!("'{}' is not a known media type", s);
                 ecx.span_warn(kv.value.span, &msg);
@@ -272,7 +273,8 @@ fn parse_format(ecx: &ExtCtxt, kv: &KVSpanned<LitKind>) -> MediaType {
     ecx.struct_span_err(kv.span, r#"`format` must be a "media/type""#)
         .help(r#"format, if specified, must be a key-value pair where
               the key is `format` and the value is a string representing the
-              media type accepted. e.g: format = "application/json""#)
+              media type accepted. e.g: format = "application/json".
+              shorthand is also accepted: format = "json"#)
         .emit();
 
     MediaType::Any

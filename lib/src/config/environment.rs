@@ -20,6 +20,36 @@ pub enum Environment {
 }
 
 impl Environment {
+    /// Retrieves the "active" environment as determined by the `ROCKET_ENV`
+    /// environment variable. If `ROCKET_ENV` is not set, returns `Development`
+    /// when the application was compiled in `debug` mode and `Production` when
+    /// the application was compiled in `release` mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `BadEnv` `ConfigError` if `ROCKET_ENV` is set and contains an
+    /// invalid or unknown environment name.
+    pub fn active() -> Result<Environment, ConfigError> {
+        match env::var(CONFIG_ENV) {
+            Ok(s) => s.parse().map_err(|_| ConfigError::BadEnv(s)),
+            #[cfg(debug_assertions)]
+            _ => Ok(Development),
+            #[cfg(not(debug_assertions))]
+            _ => Ok(Production),
+        }
+    }
+
+    /// Returns a string with a comma-seperated list of valid environments.
+    pub(crate) fn valid() -> &'static str {
+        "development, staging, production"
+    }
+
+    /// Returns a list of all of the possible environments.
+    #[inline]
+    pub(crate) fn all() -> [Environment; 3] {
+        [Development, Staging, Production]
+    }
+
     /// Returns `true` if `self` is `Environment::Development`.
     ///
     /// # Example
@@ -32,10 +62,7 @@ impl Environment {
     /// ```
     #[inline]
     pub fn is_dev(self) -> bool {
-        match self {
-            Development => true,
-            _ => false
-        }
+        self == Development
     }
 
     /// Returns `true` if `self` is `Environment::Staging`.
@@ -50,10 +77,7 @@ impl Environment {
     /// ```
     #[inline]
     pub fn is_stage(self) -> bool {
-        match self {
-            Staging => true,
-            _ => false
-        }
+        self == Staging
     }
 
     /// Returns `true` if `self` is `Environment::Production`.
@@ -68,35 +92,7 @@ impl Environment {
     /// ```
     #[inline]
     pub fn is_prod(self) -> bool {
-        match self {
-            Production => true,
-            _ => false
-        }
-    }
-}
-
-impl Environment {
-    /// Retrieves the "active" environment as determined by the `ROCKET_ENV`
-    /// environment variable. If `ROCKET_ENV` is not set, returns `Development`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a `BadEnv` `ConfigError` if `ROCKET_ENV` contains an invalid
-    /// environment name.
-    pub fn active() -> Result<Environment, ConfigError> {
-        let env_str = env::var(CONFIG_ENV).unwrap_or(Development.to_string());
-        env_str.parse().map_err(|_| ConfigError::BadEnv(env_str))
-    }
-
-    /// Returns a string with a comma-seperated list of valid environments.
-    pub(crate) fn valid() -> &'static str {
-        "development, staging, production"
-    }
-
-    /// Returns a list of all of the possible environments.
-    #[inline]
-    pub(crate) fn all() -> [Environment; 3] {
-        [Development, Staging, Production]
+        self == Production
     }
 }
 
