@@ -1,8 +1,7 @@
-#![feature(plugin, decl_macro, custom_derive)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro, never_type)]
 
+#[macro_use] extern crate rocket;
 extern crate rocket_contrib;
-extern crate rocket;
 
 #[cfg(test)] mod tests;
 
@@ -12,7 +11,7 @@ use rocket::outcome::IntoOutcome;
 use rocket::request::{self, Form, FlashMessage, FromRequest, Request};
 use rocket::response::{Redirect, Flash};
 use rocket::http::{Cookie, Cookies};
-use rocket_contrib::Template;
+use rocket_contrib::templates::Template;
 
 #[derive(FromForm)]
 struct Login {
@@ -24,9 +23,9 @@ struct Login {
 struct User(usize);
 
 impl<'a, 'r> FromRequest<'a, 'r> for User {
-    type Error = ();
+    type Error = !;
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<User, ()> {
+    fn from_request(request: &'a Request<'r>) -> request::Outcome<User, !> {
         request.cookies()
             .get_private("user_id")
             .and_then(|cookie| cookie.value().parse().ok())
@@ -36,24 +35,24 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 }
 
 #[post("/login", data = "<login>")]
-fn login(mut cookies: Cookies, login: Form<Login>) -> Flash<Redirect> {
-    if login.get().username == "Sergio" && login.get().password == "password" {
+fn login(mut cookies: Cookies, login: Form<Login>) -> Result<Redirect, Flash<Redirect>> {
+    if login.username == "Sergio" && login.password == "password" {
         cookies.add_private(Cookie::new("user_id", 1.to_string()));
-        Flash::success(Redirect::to("/"), "Successfully logged in.")
+        Ok(Redirect::to(uri!(index)))
     } else {
-        Flash::error(Redirect::to("/login"), "Invalid username/password.")
+        Err(Flash::error(Redirect::to(uri!(login_page)), "Invalid username/password."))
     }
 }
 
 #[post("/logout")]
 fn logout(mut cookies: Cookies) -> Flash<Redirect> {
     cookies.remove_private(Cookie::named("user_id"));
-    Flash::success(Redirect::to("/login"), "Successfully logged out.")
+    Flash::success(Redirect::to(uri!(login_page)), "Successfully logged out.")
 }
 
 #[get("/login")]
 fn login_user(_user: User) -> Redirect {
-    Redirect::to("/")
+    Redirect::to(uri!(index))
 }
 
 #[get("/login", rank = 2)]
@@ -75,7 +74,7 @@ fn user_index(user: User) -> Template {
 
 #[get("/", rank = 2)]
 fn index() -> Redirect {
-    Redirect::to("/login")
+    Redirect::to(uri!(login_page))
 }
 
 fn rocket() -> rocket::Rocket {

@@ -1,35 +1,18 @@
-#![feature(plugin, decl_macro, custom_derive)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro)]
 
-extern crate rocket;
+#[macro_use] extern crate rocket;
 
 use std::io;
 
-use rocket::request::{Form, FromFormValue};
+use rocket::request::{Form, FormError, FormDataError};
 use rocket::response::NamedFile;
 use rocket::http::RawStr;
 
 #[cfg(test)] mod tests;
 
-// TODO: Make deriving `FromForm` for this enum possible.
-#[derive(Debug)]
+#[derive(Debug, FromFormValue)]
 enum FormOption {
     A, B, C
-}
-
-impl<'v> FromFormValue<'v> for FormOption {
-    type Error = &'v RawStr;
-
-    fn from_form_value(v: &'v RawStr) -> Result<Self, Self::Error> {
-        let variant = match v.as_str() {
-            "a" => FormOption::A,
-            "b" => FormOption::B,
-            "c" => FormOption::C,
-            _ => return Err(v)
-        };
-
-        Ok(variant)
-    }
 }
 
 #[derive(Debug, FromForm)]
@@ -45,11 +28,13 @@ struct FormInput<'r> {
 }
 
 #[post("/", data = "<sink>")]
-fn sink<'r>(sink: Result<Form<'r, FormInput<'r>>, Option<String>>) -> String {
+fn sink(sink: Result<Form<FormInput>, FormError>) -> String {
     match sink {
-        Ok(form) => format!("{:?}", form.get()),
-        Err(Some(f)) => format!("Invalid form input: {}", f),
-        Err(None) => format!("Form input was invalid UTF8."),
+        Ok(form) => format!("{:?}", &*form),
+        Err(FormDataError::Io(_)) => format!("Form input was invalid UTF-8."),
+        Err(FormDataError::Malformed(f)) | Err(FormDataError::Parse(_, f)) => {
+            format!("Invalid form input: {}", f)
+        }
     }
 }
 

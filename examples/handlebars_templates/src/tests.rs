@@ -1,8 +1,9 @@
-use super::rocket;
+use super::{rocket, TemplateContext};
+
 use rocket::local::{Client, LocalResponse};
 use rocket::http::Method::*;
 use rocket::http::Status;
-use rocket_contrib::Template;
+use rocket_contrib::templates::Template;
 
 macro_rules! dispatch {
     ($method:expr, $path:expr, $test_fn:expr) => ({
@@ -40,10 +41,12 @@ fn test_root() {
 #[test]
 fn test_name() {
     // Check that the /hello/<name> route works.
-    dispatch!(Get, "/hello/Jack", |client: &Client, mut response: LocalResponse| {
-        let context = super::TemplateContext {
-            name: "Jack".into(),
-            items: vec!["One".into(), "Two".into(), "Three".into()]
+    dispatch!(Get, "/hello/Jack%20Daniels", |client: &Client, mut response: LocalResponse| {
+        let context = TemplateContext {
+            title: "Hello",
+            name: Some("Jack Daniels".into()),
+            items: vec!["One", "Two", "Three"],
+            parent: "layout",
         };
 
         let expected = Template::show(client.rocket(), "index", &context).unwrap();

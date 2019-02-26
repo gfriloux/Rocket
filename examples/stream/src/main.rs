@@ -1,7 +1,6 @@
-#![feature(plugin, decl_macro)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro)]
 
-extern crate rocket;
+#[macro_use] extern crate rocket;
 
 #[cfg(test)] mod tests;
 
@@ -13,7 +12,7 @@ use std::fs::File;
 type LimitedRepeat = Take<Repeat>;
 
 // Generate this file using: head -c BYTES /dev/random > big_file.dat
-const FILENAME: &'static str = "big_file.dat";
+const FILENAME: &str = "big_file.dat";
 
 #[get("/")]
 fn root() -> content::Plain<Stream<LimitedRepeat>> {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Brings in: ROOT_DIR, EXAMPLES_DIR, LIB_DIR, CODEGEN_DIR, CONTRIB_DIR, DOC_DIR
+# Brings in _ROOT, _DIR, _DIRS globals.
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 source "${SCRIPT_DIR}/config.sh"
 
@@ -31,7 +31,7 @@ function check_versions_match() {
 # Ensures there are no tabs in any file.
 function ensure_tab_free() {
   local tab=$(printf '\t')
-  local matches=$(git grep -E -I "${tab}" "${ROOT_DIR}" | grep -v 'LICENSE')
+  local matches=$(git grep -E -I "${tab}" "${PROJECT_ROOT}" | grep -v 'LICENSE')
   if ! [ -z "${matches}" ]; then
     echo "Tab characters were found in the following:"
     echo "${matches}"
@@ -41,7 +41,7 @@ function ensure_tab_free() {
 
 # Ensures there are no files with trailing whitespace.
 function ensure_trailing_whitespace_free() {
-  local matches=$(git grep -E -I "\s+$" "${ROOT_DIR}")
+  local matches=$(git grep -E -I "\s+$" "${PROJECT_ROOT}")
   if ! [ -z "${matches}" ]; then
     echo "Trailing whitespace was found in the following:"
     echo "${matches}"
@@ -49,26 +49,8 @@ function ensure_trailing_whitespace_free() {
   fi
 }
 
-function bootstrap_examples() {
-  while read -r file; do
-    bootstrap_script="${file}/bootstrap.sh"
-    if [ -x "${bootstrap_script}" ]; then
-      echo "    Bootstrapping ${file}..."
-
-      env_vars=$(bash "${bootstrap_script}")
-      bootstrap_result=$?
-      if [ $bootstrap_result -ne 0 ]; then
-        echo "    Running bootstrap script (${bootstrap_script}) failed!"
-        exit 1
-      else
-        eval $env_vars
-      fi
-    fi
-  done < <(find "${EXAMPLES_DIR}" -maxdepth 1 -type d)
-}
-
 echo ":: Ensuring all crate versions match..."
-check_versions_match "${LIB_DIR}" "${CODEGEN_DIR}" "${CONTRIB_DIR}"
+check_versions_match "${ALL_PROJECT_DIRS[@]}"
 
 echo ":: Checking for tabs..."
 ensure_tab_free
@@ -79,8 +61,55 @@ ensure_trailing_whitespace_free
 echo ":: Updating dependencies..."
 cargo update
 
-echo ":: Bootstrapping examples..."
-bootstrap_examples
+if [ "$1" = "--contrib" ]; then
+  FEATURES=(
+    json
+    msgpack
+    tera_templates
+    handlebars_templates
+    serve
+    helmet
+    diesel_postgres_pool
+    diesel_sqlite_pool
+    diesel_mysql_pool
+    postgres_pool
+    mysql_pool
+    sqlite_pool
+    cypher_pool
+    redis_pool
+    mongodb_pool
+    memcache_pool
+  )
 
-echo ":: Building and testing libraries..."
-CARGO_INCREMENTAL=0 cargo test --all-features --all $@
+  pushd "${CONTRIB_LIB_ROOT}" > /dev/null 2>&1
+
+  echo ":: Building and testing contrib [default]..."
+  CARGO_INCREMENTAL=0 cargo test
+
+  for feature in "${FEATURES[@]}"; do
+    echo ":: Building and testing contrib [${feature}]..."
+    CARGO_INCREMENTAL=0 cargo test --no-default-features --features "${feature}"
+  done
+
+  popd > /dev/null 2>&1
+elif [ "$1" = "--core" ]; then
+  FEATURES=(
+    private-cookies # this is already tested since it's the default feature
+    tls
+  )
+
+  pushd "${CORE_LIB_ROOT}" > /dev/null 2>&1
+
+  echo ":: Building and testing core [no features]..."
+  CARGO_INCREMENTAL=0 cargo test --no-default-features
+
+  for feature in "${FEATURES[@]}"; do
+    echo ":: Building and testing core [${feature}]..."
+    CARGO_INCREMENTAL=0 cargo test --no-default-features --features "${feature}"
+  done
+
+  popd > /dev/null 2>&1
+else
+  echo ":: Building and testing libraries..."
+  CARGO_INCREMENTAL=0 cargo test --all-features --all $@
+fi

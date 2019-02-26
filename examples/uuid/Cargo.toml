@@ -2,14 +2,14 @@
 name = "uuid"
 version = "0.1.0"
 workspace = "../../"
+publish = false
 
 [dependencies]
-rocket = { path = "../../lib" }
-rocket_codegen = { path = "../../codegen" }
-uuid = ">= 0.5, <= 0.6"
+rocket = { path = "../../core/lib" }
 lazy_static = "1.0"
+uuid = "0.7"
 
 [dependencies.rocket_contrib]
 default-features = false
-path = "../../contrib"
+path = "../../contrib/lib"
 features = ["uuid"]

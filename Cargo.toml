@@ -3,9 +3,11 @@ codegen-units = 4
 
 [workspace]
 members = [
-  "lib/",
-  "codegen/",
-  "contrib/",
+  "core/lib/",
+  "core/codegen/",
+  "core/http/",
+  "contrib/lib",
+  "contrib/codegen",
   "examples/cookies",
   "examples/errors",
   "examples/form_validation",
@@ -20,6 +22,7 @@ members = [
   "examples/content_types",
   "examples/ranking",
   "examples/testing",
+  "examples/request_local_state",
   "examples/request_guard",
   "examples/stream",
   "examples/json",
@@ -37,4 +40,5 @@ members = [
   "examples/raw_sqlite",
   "examples/tls",
   "examples/fairings",
+  "examples/hello_2018",
 ]

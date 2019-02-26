@@ -10,10 +10,9 @@ Rocket is web framework for Rust (nightly) with a focus on ease-of-use,
 expressibility, and speed. Here's an example of a complete Rocket application:
 
 ```rust
-#![feature(plugin, decl_macro)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro)]
 
-extern crate rocket;
+#[macro_use] extern crate rocket;
 
 #[get("/<name>/<age>")]
 fn hello(name: String, age: u8) -> String {
@@ -40,11 +39,11 @@ Rocket is extensively documented:
   * [Guide]: A detailed guide and reference to Rocket.
   * [API Documentation]: The "rustdocs".
 
-[Quickstart]: https://rocket.rs/guide/quickstart
-[Getting Started]: https://rocket.rs/guide/getting-started
-[Overview]: https://rocket.rs/overview
-[Guide]: https://rocket.rs/guide
-[API Documentation]: https://api.rocket.rs/rocket
+[Quickstart]: https://rocket.rs/v0.4/guide/quickstart
+[Getting Started]: https://rocket.rs/v0.4/guide/getting-started
+[Overview]: https://rocket.rs/v0.4/overview
+[Guide]: https://rocket.rs/v0.4/guide
+[API Documentation]: https://api.rocket.rs/v0.4/rocket
 
 The official community support channels are the `#rocket` IRC channel on the
 [Mozilla IRC Server](https://wiki.mozilla.org/IRC) at `irc.mozilla.org` and the
@@ -112,7 +111,7 @@ for information on how to write compiler tests.
 
 You can build the Rocket API documentation locally by running
 `./scripts/mk-docs.sh`. The resulting documentation is what gets uploaded to
-[api.rocket.rs](https://api.rocket.rs).
+[api.rocket.rs](https://api.rocket.rs/v0.4/).
 
 ## Contributing
 
@@ -142,71 +141,6 @@ explicitly state otherwise, any contribution intentionally submitted for
 inclusion in Rocket by you shall be dual licensed under the MIT License and
 Apache License, Version 2.0, without any additional terms or conditions.
 
-## Performance
-
-Rocket is designed to be performant. At this time, its performance is
-[bottlenecked by the Hyper HTTP
-library](https://github.com/SergioBenitez/Rocket/issues/17). Even so, Rocket
-currently performs _significantly better_ than the latest version of
-multithreaded asynchronous Hyper on a simple "Hello, world!" benchmark. Rocket
-also performs _significantly better_ than the Iron web framework:
-
-**Machine Specs:**
-
-  * **Logical Cores:** 12 (6 cores x 2 threads)
-  * **Memory:** 24gb ECC DDR3 @ 1600mhz
-  * **Processor:** Intel Xeon X5675 @ 3.07GHz
-  * **Operating System:** Mac OS X v10.11.6
-
-**Rocket v0.2-rc** (8 LOC) results (best of 3, +/- 2000 req/s, +/- 5us latency):
-
-    Running 10s test @ http://localhost:80
-      1 threads and 18 connections
-      Thread Stats   Avg      Stdev     Max   +/- Stdev
-        Latency   153.01us   42.25us 449.00us   75.54%
-        Req/Sec    75.58k    11.75k   90.22k    54.46%
-      758044 requests in 10.10s, 105.55MB read
-    Requests/sec:  75051.28
-    Transfer/sec:     10.45MB
-
-**Hyper v0.10-rotor (1/12/2016)** (46 LOC) results (best of 3, +/- 5000 req/s, +/- 30us latency):
-
-    Running 10s test @ http://localhost:80
-      1 threads and 18 connections
-      Thread Stats   Avg      Stdev     Max   +/- Stdev
-        Latency   287.81us   77.09us 606.00us   70.47%
-        Req/Sec    59.94k     6.01k   79.72k    71.00%
-      596231 requests in 10.00s, 83.02MB read
-    Requests/sec:  59621.32
-    Transfer/sec:      8.30MB
-
-**Iron v0.5.0** (11 LOC) results (best of 3, +/- 3000 req/s, +/- 500us latency):
-
-    Running 10s test @ http://localhost:80
-      1 threads and 18 connections
-      Thread Stats   Avg      Stdev     Max   +/- Stdev
-        Latency   512.36us    5.57ms 149.99ms   99.60%
-        Req/Sec    58.25k    11.61k   70.47k    46.00%
-      579227 requests in 10.00s, 80.65MB read
-    Requests/sec:  57920.73
-    Transfer/sec:      8.06MB
-
-**Summary:**
-
-  * Rocket throughput higher by 25.9% (higher is better) compared to Hyper.
-  * Rocket throughput higher by 29.6% (higher is better) compared to Iron.
-  * Rocket latency lower by 46.8% (lower is better) compared to Hyper.
-  * Rocket latency lower by 70.1% (lower is better) compared to Iron.
-
-### Future Improvements
-
-Rocket is currently built on a synchronous HTTP backend. Once the Rust
-asynchronous I/O libraries have stabilized, a migration to a new, more
-performant HTTP backend is planned. We expect performance to improve
-significantly at that time. The [Stabilize HTTP
-Library](https://github.com/SergioBenitez/Rocket/issues/17) issue tracks the
-progress on this front.
-
 ## License
 
 Rocket is licensed under either of the following, at your option:
@@ -214,4 +148,4 @@ Rocket is licensed under either of the following, at your option:
  * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
  * MIT License ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
-The Rocket website source is licensed under [separate terms](site/README.md#license).
+The Rocket website source is licensed under [separate terms](site#license).

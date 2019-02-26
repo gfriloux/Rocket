@@ -1,38 +1,47 @@
-#![feature(plugin, decl_macro, custom_derive, const_fn)]
-#![plugin(rocket_codegen)]
+#![feature(proc_macro_hygiene, decl_macro)]
 
-extern crate rocket;
+#[macro_use] extern crate rocket;
 #[macro_use] extern crate diesel;
+#[macro_use] extern crate diesel_migrations;
+#[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
-extern crate rocket_contrib;
+#[macro_use] extern crate rocket_contrib;
 
-mod static_files;
 mod task;
-mod db;
 #[cfg(test)] mod tests;
 
 use rocket::Rocket;
+use rocket::fairing::AdHoc;
 use rocket::request::{Form, FlashMessage};
 use rocket::response::{Flash, Redirect};
-use rocket_contrib::Template;
+use rocket_contrib::{templates::Template, serve::StaticFiles};
+use diesel::SqliteConnection;
 
 use task::{Task, Todo};
+
+// This macro from `diesel_migrations` defines an `embedded_migrations` module
+// containing a function named `run`. This allows the example to be run and
+// tested without any outside setup of the database.
+embed_migrations!();
+
+#[database("sqlite_database")]
+pub struct DbConn(SqliteConnection);
 
 #[derive(Debug, Serialize)]
 struct Context<'a, 'b>{ msg: Option<(&'a str, &'b str)>, tasks: Vec<Task> }
 
 impl<'a, 'b> Context<'a, 'b> {
-    pub fn err(conn: &db::Conn, msg: &'a str) -> Context<'static, 'a> {
+    pub fn err(conn: &DbConn, msg: &'a str) -> Context<'static, 'a> {
         Context{msg: Some(("error", msg)), tasks: Task::all(conn)}
     }
 
-    pub fn raw(conn: &db::Conn, msg: Option<(&'a str, &'b str)>) -> Context<'a, 'b> {
+    pub fn raw(conn: &DbConn, msg: Option<(&'a str, &'b str)>) -> Context<'a, 'b> {
         Context{msg: msg, tasks: Task::all(conn)}
     }
 }
 
 #[post("/", data = "<todo_form>")]
-fn new(todo_form: Form<Todo>, conn: db::Conn) -> Flash<Redirect> {
+fn new(todo_form: Form<Todo>, conn: DbConn) -> Flash<Redirect> {
     let todo = todo_form.into_inner();
     if todo.description.is_empty() {
         Flash::error(Redirect::to("/"), "Description cannot be empty.")
@@ -44,7 +53,7 @@ fn new(todo_form: Form<Todo>, conn: db::Conn) -> Flash<Redirect> {
 }
 
 #[put("/<id>")]
-fn toggle(id: i32, conn: db::Conn) -> Result<Redirect, Template> {
+fn toggle(id: i32, conn: DbConn) -> Result<Redirect, Template> {
     if Task::toggle_with_id(id, &conn) {
         Ok(Redirect::to("/"))
     } else {
@@ -53,7 +62,7 @@ fn toggle(id: i32, conn: db::Conn) -> Result<Redirect, Template> {
 }
 
 #[delete("/<id>")]
-fn delete(id: i32, conn: db::Conn) -> Result<Flash<Redirect>, Template> {
+fn delete(id: i32, conn: DbConn) -> Result<Flash<Redirect>, Template> {
     if Task::delete_with_id(id, &conn) {
         Ok(Flash::success(Redirect::to("/"), "Todo was deleted."))
     } else {
@@ -62,30 +71,34 @@ fn delete(id: i32, conn: db::Conn) -> Result<Flash<Redirect>, Template> {
 }
 
 #[get("/")]
-fn index(msg: Option<FlashMessage>, conn: db::Conn) -> Template {
+fn index(msg: Option<FlashMessage>, conn: DbConn) -> Template {
     Template::render("index", &match msg {
         Some(ref msg) => Context::raw(&conn, Some((msg.name(), msg.msg()))),
         None => Context::raw(&conn, None),
     })
 }
 
-fn rocket() -> (Rocket, Option<db::Conn>) {
-    let pool = db::init_pool();
-    let conn = if cfg!(test) {
-        Some(db::Conn(pool.get().expect("database connection for testing")))
-    } else {
-        None
-    };
+fn run_db_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
+    let conn = DbConn::get_one(&rocket).expect("database connection");
+    match embedded_migrations::run(&*conn) {
+        Ok(()) => Ok(rocket),
+        Err(e) => {
+            error!("Failed to run database migrations: {:?}", e);
+            Err(rocket)
+        }
+    }
+}
 
-    let rocket = rocket::ignite()
-        .manage(pool)
-        .mount("/", routes![index, static_files::all])
-        .mount("/todo/", routes![new, toggle, delete])
-        .attach(Template::fairing());
-
-    (rocket, conn)
+fn rocket() -> Rocket {
+    rocket::ignite()
+        .attach(DbConn::fairing())
+        .attach(AdHoc::on_attach("Database Migrations", run_db_migrations))
+        .mount("/", StaticFiles::from("static/"))
+        .mount("/", routes![index])
+        .mount("/todo", routes![new, toggle, delete])
+        .attach(Template::fairing())
 }
 
 fn main() {
-    rocket().0.launch();
+    rocket().launch();
 }
