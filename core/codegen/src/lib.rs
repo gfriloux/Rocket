@@ -1,18 +1,19 @@
 #![feature(proc_macro_diagnostic, proc_macro_span)]
 #![feature(crate_visibility_modifier)]
-#![feature(transpose_result)]
 #![recursion_limit="128"]
 
-#![doc(html_root_url = "https://api.rocket.rs/v0.4")]
-#![doc(html_favicon_url = "https://rocket.rs/v0.4/images/favicon.ico")]
-#![doc(html_logo_url = "https://rocket.rs/v0.4/images/logo-boxed.png")]
+#![doc(html_root_url = "https://api.rocket.rs/v0.5")]
+#![doc(html_favicon_url = "https://rocket.rs/v0.5/images/favicon.ico")]
+#![doc(html_logo_url = "https://rocket.rs/v0.5/images/logo-boxed.png")]
+
+#![warn(rust_2018_idioms)]
 
 //! # Rocket - Code Generation
 //!
 //! This crate implements the code generation portions of Rocket. This includes
 //! custom derives, custom attributes, and procedural macros. The documentation
 //! here is purely technical. The code generation facilities are documented
-//! thoroughly in the [Rocket programming guide](https://rocket.rs/v0.4/guide).
+//! thoroughly in the [Rocket programming guide](https://rocket.rs/v0.5/guide).
 //!
 //! # Usage
 //!
@@ -22,7 +23,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! rocket = "0.4.0"
+//! rocket = "0.5.0-dev"
 //! ```
 //!
 //! And to import all macros, attributes, and derives via `#[macro_use]` in the
@@ -59,10 +60,9 @@
 //! ```
 
 #[macro_use] extern crate quote;
-extern crate devise;
 extern crate proc_macro;
-extern crate rocket_http as http;
-extern crate indexmap;
+
+use rocket_http as http;
 
 macro_rules! define {
     ($val:path as $v:ident) => (#[allow(non_snake_case)] let $v = quote!($val););
@@ -98,7 +98,7 @@ mod bang;
 mod http_codegen;
 mod syn_ext;
 
-use http::Method;
+use crate::http::Method;
 use proc_macro::TokenStream;
 crate use devise::proc_macro2;
 
@@ -112,8 +112,8 @@ crate static ROCKET_PARAM_PREFIX: &str = "__rocket_param_";
 macro_rules! emit {
     ($tokens:expr) => ({
         let tokens = $tokens;
-        if ::std::env::var_os("ROCKET_CODEGEN_DEBUG").is_some() {
-            ::proc_macro::Span::call_site()
+        if std::env::var_os("ROCKET_CODEGEN_DEBUG").is_some() {
+            proc_macro::Span::call_site()
                 .note("emitting Rocket code generation debug output")
                 .note(tokens.to_string())
                 .emit()

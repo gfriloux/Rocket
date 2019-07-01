@@ -1,15 +1,15 @@
 use proc_macro::{TokenStream, Span};
-use proc_macro2::TokenStream as TokenStream2;
+use crate::proc_macro2::TokenStream as TokenStream2;
 use devise::{syn, Spanned, SpanWrapped, Result, FromMeta, ext::TypeExt};
 use indexmap::IndexSet;
 
-use proc_macro_ext::{Diagnostics, StringLit};
-use syn_ext::{syn_to_diag, IdentExt};
+use crate::proc_macro_ext::{Diagnostics, StringLit};
+use crate::syn_ext::{syn_to_diag, IdentExt};
 use self::syn::{Attribute, parse::Parser};
 
-use http_codegen::{Method, MediaType, RoutePath, DataSegment, Optional};
-use attribute::segments::{Source, Kind, Segment};
-use {ROUTE_FN_PREFIX, ROUTE_STRUCT_PREFIX, URI_MACRO_PREFIX, ROCKET_PARAM_PREFIX};
+use crate::http_codegen::{Method, MediaType, RoutePath, DataSegment, Optional};
+use crate::attribute::segments::{Source, Kind, Segment};
+use crate::{ROUTE_FN_PREFIX, ROUTE_STRUCT_PREFIX, URI_MACRO_PREFIX, ROCKET_PARAM_PREFIX};
 
 /// The raw, parsed `#[route]` attribute.
 #[derive(Debug, FromMeta)]
@@ -220,9 +220,11 @@ fn query_exprs(route: &Route) -> Option<TokenStream2> {
 
         let decl = match segment.kind {
             Kind::Single => quote_spanned! { span =>
+                #[allow(non_snake_case)]
                 let mut #ident: Option<#ty> = None;
             },
             Kind::Multi => quote_spanned! { span =>
+                #[allow(non_snake_case)]
                 let mut #trail = #SmallVec::<[#request::FormItem; 8]>::new();
             },
             Kind::Static => quote!()
@@ -253,6 +255,7 @@ fn query_exprs(route: &Route) -> Option<TokenStream2> {
 
         let builder = match segment.kind {
             Kind::Single => quote_spanned! { span =>
+                #[allow(non_snake_case)]
                 let #ident = match #ident.or_else(<#ty as #request::FromFormValue>::default) {
                     Some(__v) => __v,
                     None => {
@@ -262,6 +265,7 @@ fn query_exprs(route: &Route) -> Option<TokenStream2> {
                 };
             },
             Kind::Multi => quote_spanned! { span =>
+                #[allow(non_snake_case)]
                 let #ident = match <#ty as #request::FromQuery>::from_query(#Query(&#trail)) {
                     Ok(__v) => __v,
                     Err(__e) => {
@@ -421,7 +425,7 @@ fn complete_route(args: TokenStream2, input: TokenStream) -> Result<TokenStream>
 }
 
 fn incomplete_route(
-    method: ::http::Method,
+    method: crate::http::Method,
     args: TokenStream2,
     input: TokenStream
 ) -> Result<TokenStream> {
@@ -455,7 +459,7 @@ fn incomplete_route(
     codegen_route(parse_route(attribute, function)?)
 }
 
-pub fn route_attribute<M: Into<Option<::http::Method>>>(
+pub fn route_attribute<M: Into<Option<crate::http::Method>>>(
     method: M,
     args: TokenStream,
     input: TokenStream

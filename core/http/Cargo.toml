@@ -1,17 +1,18 @@
 [package]
 name = "rocket_http"
-version = "0.4.0"
+version = "0.5.0-dev"
 authors = ["Sergio Benitez <sb@sergio.bz>"]
 description = """
 Types, traits, and parsers for HTTP requests, responses, and headers.
 """
-documentation = "https://api.rocket.rs/v0.4/rocket_http/"
+documentation = "https://api.rocket.rs/v0.5/rocket_http/"
 homepage = "https://rocket.rs"
 repository = "https://github.com/SergioBenitez/Rocket"
 readme = "../../README.md"
 keywords = ["rocket", "web", "framework", "http"]
 license = "MIT/Apache-2.0"
 categories = ["web-programming"]
+edition = "2018"
 
 [features]
 default = []
@@ -23,9 +24,9 @@ smallvec = "0.6"
 percent-encoding = "1"
 time = "0.1"
 indexmap = "1.0"
-rustls = { version = "0.14", optional = true }
+rustls = { version = "0.15", optional = true }
 state = "0.4"
-cookie = { version = "0.11", features = ["percent-encode"] }
+cookie = { version = "0.12", features = ["percent-encode"] }
 pear = "0.1"
 unicode-xid = "0.1"
 
@@ -34,9 +35,9 @@ git = "https://github.com/gfriloux/hyper"
 branch = "0.10.x"
 
 [dependencies.hyper-sync-rustls]
-version = "=0.3.0-rc.4"
+version = "=0.3.0-rc.5"
 features = ["server"]
 optional = true
 
 [dev-dependencies]
-rocket = { version = "0.4.0", path = "../lib" }
+rocket = { version = "0.5.0-dev", path = "../lib" }

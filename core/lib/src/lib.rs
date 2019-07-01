@@ -1,18 +1,18 @@
 #![feature(specialization)]
 #![feature(decl_macro)]
 #![feature(try_trait)]
-#![feature(fnbox)]
 #![feature(never_type)]
 #![feature(proc_macro_hygiene)]
 #![feature(crate_visibility_modifier)]
-#![feature(try_from)]
 #![feature(label_break_value)]
 
 #![recursion_limit="256"]
 
-#![doc(html_root_url = "https://api.rocket.rs/v0.4")]
-#![doc(html_favicon_url = "https://rocket.rs/v0.4/images/favicon.ico")]
-#![doc(html_logo_url = "https://rocket.rs/v0.4/images/logo-boxed.png")]
+#![doc(html_root_url = "https://api.rocket.rs/v0.5")]
+#![doc(html_favicon_url = "https://rocket.rs/v0.5/images/favicon.ico")]
+#![doc(html_logo_url = "https://rocket.rs/v0.5/images/logo-boxed.png")]
+
+#![warn(rust_2018_idioms)]
 
 //! # Rocket - Core API Documentation
 //!
@@ -28,10 +28,10 @@
 //! automatic JSON (de)serialiazation, templating support, static file serving,
 //! and other useful features.
 //!
-//! [overview]: https://rocket.rs/v0.4/overview
-//! [full, detailed guide]: https://rocket.rs/v0.4/guide
-//! [quickstart]: https://rocket.rs/v0.4/guide/quickstart
-//! [getting started]: https://rocket.rs/v0.4/guide/getting-started
+//! [overview]: https://rocket.rs/v0.5/overview
+//! [full, detailed guide]: https://rocket.rs/v0.5/guide
+//! [quickstart]: https://rocket.rs/v0.5/guide/quickstart
+//! [getting started]: https://rocket.rs/v0.5/guide/getting-started
 //!
 //! ## Libraries
 //!
@@ -47,7 +47,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! rocket = "0.4.0"
+//! rocket = "0.5.0-dev"
 //! ```
 //!
 //! Then, add the following to the top of your `main.rs` file:
@@ -60,7 +60,7 @@
 //! # fn main() { rocket::ignite().mount("/", routes![hello]); }
 //! ```
 //!
-//! See the [guide](https://rocket.rs/v0.4/guide) for more information on how to
+//! See the [guide](https://rocket.rs/v0.5/guide) for more information on how to
 //! write Rocket applications. Here's a simple example to get you started:
 //!
 //! ```rust
@@ -87,7 +87,7 @@
 //! configure Rocket, see the [configuration section] of the guide as well as
 //! the [`config`] module documentation.
 //!
-//! [configuration section]: https://rocket.rs/v0.4/guide/configuration/
+//! [configuration section]: https://rocket.rs/v0.5/guide/configuration/
 //!
 //! ## Testing
 //!
@@ -96,24 +96,13 @@
 //! documentation and the [testing chapter of the guide] include detailed
 //! examples.
 //!
-//! [testing chapter of the guide]: https://rocket.rs/v0.4/guide/testing/#testing
+//! [testing chapter of the guide]: https://rocket.rs/v0.5/guide/testing/#testing
 
 #[allow(unused_imports)] #[macro_use] extern crate rocket_codegen;
 #[doc(hidden)] pub use rocket_codegen::*;
 
-extern crate rocket_http;
 #[macro_use] extern crate log;
 #[macro_use] extern crate pear;
-extern crate yansi;
-extern crate toml;
-extern crate num_cpus;
-extern crate state;
-extern crate time;
-extern crate memchr;
-extern crate base64;
-extern crate isatty;
-
-#[cfg(test)] #[macro_use] extern crate lazy_static;
 
 #[doc(hidden)] #[macro_use] pub mod logger;
 pub mod local;
@@ -143,16 +132,16 @@ mod codegen;
 mod catcher;
 mod ext;
 
-#[doc(inline)] pub use response::Response;
-#[doc(inline)] pub use handler::{Handler, ErrorHandler};
-#[doc(hidden)] pub use codegen::{StaticRouteInfo, StaticCatchInfo};
-#[doc(inline)] pub use outcome::Outcome;
-#[doc(inline)] pub use data::Data;
-#[doc(inline)] pub use config::Config;
-pub use router::Route;
-pub use request::{Request, State};
-pub use catcher::Catcher;
-pub use rocket::Rocket;
+#[doc(inline)] pub use crate::response::Response;
+#[doc(inline)] pub use crate::handler::{Handler, ErrorHandler};
+#[doc(hidden)] pub use crate::codegen::{StaticRouteInfo, StaticCatchInfo};
+#[doc(inline)] pub use crate::outcome::Outcome;
+#[doc(inline)] pub use crate::data::Data;
+#[doc(inline)] pub use crate::config::Config;
+pub use crate::router::Route;
+pub use crate::request::{Request, State};
+pub use crate::catcher::Catcher;
+pub use crate::rocket::Rocket;
 
 /// Alias to [`Rocket::ignite()`] Creates a new instance of `Rocket`.
 pub fn ignite() -> Rocket {

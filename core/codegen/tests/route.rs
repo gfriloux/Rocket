@@ -1,5 +1,10 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
+// Rocket sometimes generates mangled identifiers that activate the
+// non_snake_case lint. We deny the lint in this test to ensure that
+// code generation uses #[allow(non_snake_case)] in the appropriate places.
+#![deny(non_snake_case)]
+
 #[macro_use] extern crate rocket;
 
 use std::path::PathBuf;
@@ -23,7 +28,7 @@ struct Simple(String);
 impl FromDataSimple for Simple {
     type Error = ();
 
-    fn from_data(_: &Request, data: Data) -> data::Outcome<Self, ()> {
+    fn from_data(_: &Request<'_>, data: Data) -> data::Outcome<Self, ()> {
         use std::io::Read;
         let mut string = String::new();
         data.open().take(64).read_to_string(&mut string).unwrap();
@@ -36,7 +41,7 @@ fn post1(
     sky: usize,
     name: &RawStr,
     a: String,
-    query: Form<Inner>,
+    query: Form<Inner<'_>>,
     path: PathBuf,
     simple: Simple,
 ) -> String {
@@ -53,7 +58,7 @@ fn post2(
     sky: usize,
     name: &RawStr,
     a: String,
-    query: Form<Inner>,
+    query: Form<Inner<'_>>,
     path: PathBuf,
     simple: Simple,
 ) -> String {
@@ -63,6 +68,10 @@ fn post2(
     let uri = uri!(post2: a, name.url_decode_lossy(), path, sky, query.into_inner());
 
     format!("({}) ({})", string, uri.to_string())
+}
+
+#[post("/<_unused_param>?<_unused_query>", data="<_unused_data>")]
+fn test_unused_params(_unused_param: String, _unused_query: String, _unused_data: Data) {
 }
 
 #[test]

@@ -9,7 +9,7 @@
 //!
 //!      ```toml
 //!      [dependencies.rocket_contrib]
-//!      version = "0.4.0"
+//!      version = "0.5.0-dev"
 //!      default-features = false
 //!      features = ["handlebars_templates", "tera_templates"]
 //!      ```
@@ -57,7 +57,7 @@
 //! template directory is configured via the `template_dir` configuration
 //! parameter and defaults to `templates/`. The path set in `template_dir` is
 //! relative to the Rocket configuration file. See the [configuration
-//! chapter](https://rocket.rs/v0.4/guide/configuration/#extras) of the guide
+//! chapter](https://rocket.rs/v0.5/guide/configuration/#extras) of the guide
 //! for more information on configuration.
 //!
 //! The corresponding templating engine used for a given template is based on a
@@ -111,10 +111,6 @@
 //! [`Template::custom()`]: templates::Template::custom()
 //! [`Template::render()`]: templates::Template::render()
 
-extern crate serde;
-extern crate serde_json;
-extern crate glob;
-
 #[cfg(feature = "tera_templates")] pub extern crate tera;
 #[cfg(feature = "tera_templates")] mod tera_templates;
 
@@ -133,9 +129,9 @@ crate use self::fairing::ContextManager;
 
 use self::engine::Engine;
 use self::fairing::TemplateFairing;
-use self::serde::Serialize;
-use self::serde_json::{Value, to_value};
-use self::glob::glob;
+
+use serde::Serialize;
+use serde_json::{Value, to_value};
 
 use std::borrow::Cow;
 use std::path::PathBuf;
@@ -158,7 +154,7 @@ const DEFAULT_TEMPLATE_DIR: &str = "templates";
 ///
 /// ```toml
 /// [dependencies.rocket_contrib]
-/// version = "0.4.0"
+/// version = "0.5.0-dev"
 /// default-features = false
 /// features = ["handlebars_templates", "tera_templates"]
 /// ```
@@ -298,6 +294,7 @@ impl Template {
     /// # context.insert("test", "test");
     /// # #[allow(unused_variables)]
     /// let template = Template::render("index", context);
+    /// ```
     #[inline]
     pub fn render<S, C>(name: S, context: C) -> Template
         where S: Into<Cow<'static, str>>, C: Serialize
@@ -386,8 +383,8 @@ impl Template {
 /// extension and a fixed-size body containing the rendered template. If
 /// rendering fails, an `Err` of `Status::InternalServerError` is returned.
 impl Responder<'static> for Template {
-    fn respond_to(self, req: &Request) -> response::Result<'static> {
-        let ctxt = req.guard::<State<ContextManager>>().succeeded().ok_or_else(|| {
+    fn respond_to(self, req: &Request<'_>) -> response::Result<'static> {
+        let ctxt = req.guard::<State<'_, ContextManager>>().succeeded().ok_or_else(|| {
             error_!("Uninitialized template context: missing fairing.");
             info_!("To use templates, you must attach `Template::fairing()`.");
             info_!("See the `Template` documentation for more information.");

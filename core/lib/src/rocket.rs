@@ -8,23 +8,23 @@ use std::mem;
 use yansi::Paint;
 use state::Container;
 
-#[cfg(feature = "tls")] use http::tls::TlsServer;
+#[cfg(feature = "tls")] use crate::http::tls::TlsServer;
 
-use {logger, handler};
-use ext::ReadExt;
-use config::{self, Config, LoggedValue};
-use request::{Request, FormItems};
-use data::Data;
-use response::{Body, Response};
-use router::{Router, Route};
-use catcher::{self, Catcher};
-use outcome::Outcome;
-use error::{LaunchError, LaunchErrorKind};
-use fairing::{Fairing, Fairings};
+use crate::{logger, handler};
+use crate::ext::ReadExt;
+use crate::config::{self, Config, LoggedValue};
+use crate::request::{Request, FormItems};
+use crate::data::Data;
+use crate::response::{Body, Response};
+use crate::router::{Router, Route};
+use crate::catcher::{self, Catcher};
+use crate::outcome::Outcome;
+use crate::error::{LaunchError, LaunchErrorKind};
+use crate::fairing::{Fairing, Fairings};
 
-use http::{Method, Status, Header};
-use http::hyper::{self, header};
-use http::uri::Origin;
+use crate::http::{Method, Status, Header};
+use crate::http::hyper::{self, header};
+use crate::http::uri::Origin;
 
 /// The main `Rocket` type: used to mount routes and catchers and launch the
 /// application.
@@ -115,7 +115,7 @@ macro_rules! serve {
 
 impl Rocket {
     #[inline]
-    fn issue_response(&self, response: Response, hyp_res: hyper::FreshResponse) {
+    fn issue_response(&self, response: Response<'_>, hyp_res: hyper::FreshResponse<'_>) {
         match self.write_response(response, hyp_res) {
             Ok(_) => info_!("{}", Paint::green("Response succeeded.")),
             Err(e) => error_!("Failed to write response: {:?}.", e),
@@ -125,8 +125,8 @@ impl Rocket {
     #[inline]
     fn write_response(
         &self,
-        mut response: Response,
-        mut hyp_res: hyper::FreshResponse,
+        mut response: Response<'_>,
+        mut hyp_res: hyper::FreshResponse<'_>,
     ) -> io::Result<()> {
         *hyp_res.status_mut() = hyper::StatusCode::from_u16(response.status().code);
 
@@ -175,7 +175,7 @@ impl Rocket {
     ///   * Rewriting the method in the request if _method form field exists.
     ///
     /// Keep this in-sync with derive_form when preprocessing form fields.
-    fn preprocess_request(&self, req: &mut Request, data: &Data) {
+    fn preprocess_request(&self, req: &mut Request<'_>, data: &Data) {
         // Check if this is a form and if the form contains the special _method
         // field which we use to reinterpret the request's method.
         let data_len = data.peek().len();
@@ -216,9 +216,13 @@ impl Rocket {
         // Route the request and run the user's handlers.
         let mut response = self.route_and_process(request, data);
 
-        // Add the 'rocket' server header to the response and run fairings.
+        // Add a default 'Server' header if it isn't already there.
         // TODO: If removing Hyper, write out `Date` header too.
-        response.set_header(Header::new("Server", "Rocket"));
+        if !response.headers().contains("Server") {
+            response.set_header(Header::new("Server", "Rocket"));
+        }
+
+        // Run the response fairings.
         self.fairings.handle_response(request, &mut response);
 
         // Strip the body if this is a `HEAD` request.
@@ -309,7 +313,7 @@ impl Rocket {
     crate fn handle_error<'r>(
         &self,
         status: Status,
-        req: &'r Request
+        req: &'r Request<'_>
     ) -> Response<'r> {
         warn_!("Responding with {} catcher.", Paint::red(&status));
 
@@ -334,7 +338,7 @@ impl Rocket {
     /// documentation for more information on defaults.
     ///
     /// This method is typically called through the
-    /// [`rocket::ignite()`](::ignite) alias.
+    /// [`rocket::ignite()`](crate::ignite) alias.
     ///
     /// # Panics
     ///
@@ -569,7 +573,7 @@ impl Rocket {
     /// refers to a different `T`.
     ///
     /// Managed state can be retrieved by any request handler via the
-    /// [`State`](::State) request guard. In particular, if a value of type `T`
+    /// [`State`](crate::State) request guard. In particular, if a value of type `T`
     /// is managed by Rocket, adding `State<T>` to the list of arguments in a
     /// request handler instructs Rocket to retrieve the managed value.
     ///

@@ -52,14 +52,14 @@ your application explicitly handles.
 
 ### Reinterpreting
 
-Because browsers can only send `GET` and `POST` requests, Rocket _reinterprets_
-request methods under certain conditions. If a `POST` request contains a body of
-`Content-Type: application/x-www-form-urlencoded` and the form's **first**
-field has the name `_method` and a valid HTTP method name as its value (such as
-`"PUT"`), that field's value is used as the method for the incoming request.
-This allows Rocket applications to submit non-`POST` forms. The [todo
-example](@example/todo/static/index.html.tera#L47) makes use of this feature to
-submit `PUT` and `DELETE` requests from a web form.
+Because HTML forms can only be directly submitted as `GET` or `POST` requests,
+Rocket _reinterprets_ request methods under certain conditions. If a `POST`
+request contains a body of `Content-Type: application/x-www-form-urlencoded` and
+the form's **first** field has the name `_method` and a valid HTTP method name
+as its value (such as `"PUT"`), that field's value is used as the method for the
+incoming request.  This allows Rocket applications to submit non-`POST` forms.
+The [todo example](@example/todo/static/index.html.tera#L47) makes use of this
+feature to submit `PUT` and `DELETE` requests from a web form.
 
 ## Dynamic Paths
 
@@ -154,7 +154,7 @@ fn files(file: PathBuf) -> Option<NamedFile> {
   the [`StaticFiles`] custom handler from [`rocket_contrib`], which makes it as
   simple as:
 
-  `rocket.mount("/public", StaticFiles::from("/static")`
+  `rocket.mount("/public", StaticFiles::from("/static"))`
 
 [`rocket_contrib`]: @api/rocket_contrib/
 [`StaticFiles`]: @api/rocket_contrib/serve/struct.StaticFiles.html
@@ -190,11 +190,18 @@ fn user_int(id: isize) -> T { ... }
 
 #[get("/user/<id>", rank = 3)]
 fn user_str(id: &RawStr) -> T { ... }
+
+fn main() {
+    rocket::ignite()
+        .mount("/", routes![user, user_int, user_str])
+        .launch();
+}
 ```
 
 Notice the `rank` parameters in `user_int` and `user_str`. If we run this
-application with the routes mounted at the root, requests to `/user/<id>` will
-be routed as follows:
+application with the routes mounted at the root path, as is done in `main`
+above, requests to `/user/<id>` (such as `/user/123`, `/user/Bob`, and so on)
+will be routed as follows:
 
   1. The `user` route matches first. If the string at the `<id>` position is an
      unsigned integer, then the `user` handler is called. If it is not, then the
@@ -205,6 +212,11 @@ be routed as follows:
 
   3. The `user_str` route matches last. Since `<id>` is a always string, the
      route always matches. The `user_str` handler is called.
+
+! note: A route's rank appears in **[brackets]** during launch.
+
+  You'll also find a route's rank logged in brackets during application launch:
+  `GET /user/<id> [3] (user_str)`.
 
 Forwards can be _caught_ by using a `Result` or `Option` type. For example, if
 the type of `id` in the `user` function was `Result<usize, &RawStr>`, then `user`
@@ -276,14 +288,9 @@ string contains all of the static components of a route's query string, the
 request will be routed to that route. This allows for optional parameters,
 validating even when a parameter is missing.
 
-More specifically, types that return `Some` from their
-[`FromFormValue::default()`] implementations will validate even when a value for
-the given parameter is missing, using the value returned from the `default()`
-method as the parameter's value. On such type is `Option<T>`, which returns
-`None` from its `default()` implementation. By using a type of `Option<T>` for a
-query parameter, `Some(T)` will be returned only when the parameter is present
-and represents a valid `T`. In all other cases, `None` will be returned. A route
-using `Option<T>` looks as follows:
+To achieve this, use `Option<T>` as the parameter type. Whenever the query
+parameter is missing in a request, `None` will be provided as the value.  A
+route using `Option<T>` looks as follows:
 
 ```rust
 #[get("/hello?wave&<name>")]
@@ -298,8 +305,11 @@ routed to this route. If a `name=value` query segment is present, the route
 returns the string `"Hi, value!"`. If no `name` query segment is present, the
 route returns `"Hello!"`.
 
-Other defaultable `FromFormValue` types include `Result<T, E>` and `bool`. As
-always, your types can implement `FromFormValue` in a defaultable manner, too!
+Just like a parameter of type `Option<T>` will have the value `None` if the
+parameter is missing from a query, a parameter of type `bool` will have the
+value `false` if it is missing. The default value for a missing parameter can be
+customized for your own types that implement `FromFormValue` by implementing
+[`FromFormValue::default()`].
 
 [`FromFormValue::default()`]: @api/rocket/request/trait.FromFormValue.html#method.default
 
@@ -478,7 +488,7 @@ fn admin_panel_redirect() -> Redirect {
 
 The three routes above encode authentication _and_ authorization. The
 `admin_panel` route only succeeds if an administrator is logged in. Only then is
-the admin panel displayed. If the user is not an admin, the `AdminUser` route
+the admin panel displayed. If the user is not an admin, the `AdminUser` guard
 will forward. Since the `admin_panel_user` route is ranked next highest, it is
 attempted next. This route succeeds if there is _any_ user signed in, and an
 authorization failure message is displayed. Finally, if a user isn't signed in,
@@ -550,7 +560,7 @@ so that you depend on `rocket` as follows:
 
 ```toml
 [dependencies]
-rocket = { version = "0.4.0", default-features = false }
+rocket = { version = "0.5.0-dev", default-features = false }
 ```
 
 [`ring`]: https://github.com/briansmith/ring

@@ -9,16 +9,14 @@
 //!
 //! ```toml
 //! [dependencies.rocket_contrib]
-//! version = "0.4.0"
+//! version = "0.5.0-dev"
 //! default-features = false
 //! features = ["json"]
 //! ```
 
-extern crate serde;
-extern crate serde_json;
-
 use std::ops::{Deref, DerefMut};
 use std::io::{self, Read};
+use std::iter::FromIterator;
 
 use rocket::request::Request;
 use rocket::outcome::Outcome::*;
@@ -26,11 +24,11 @@ use rocket::data::{Outcome, Transform, Transform::*, Transformed, Data, FromData
 use rocket::response::{self, Responder, content};
 use rocket::http::Status;
 
-use self::serde::{Serialize, Serializer};
-use self::serde::de::{Deserialize, Deserializer};
+use serde::{Serialize, Serializer};
+use serde::de::{Deserialize, Deserializer};
 
 #[doc(hidden)]
-pub use self::serde_json::{json_internal, json_internal_vec};
+pub use serde_json::{json_internal, json_internal_vec};
 
 /// The JSON type: implements [`FromData`] and [`Responder`], allowing you to
 /// easily consume and respond with JSON.
@@ -135,7 +133,7 @@ impl<'a, T: Deserialize<'a>> FromData<'a> for Json<T> {
     type Owned = String;
     type Borrowed = str;
 
-    fn transform(r: &Request, d: Data) -> Transform<Outcome<Self::Owned, Self::Error>> {
+    fn transform(r: &Request<'_>, d: Data) -> Transform<Outcome<Self::Owned, Self::Error>> {
         let size_limit = r.limits().get("json").unwrap_or(LIMIT);
         let mut s = String::with_capacity(512);
         match d.open().take(size_limit).read_to_string(&mut s) {
@@ -144,7 +142,7 @@ impl<'a, T: Deserialize<'a>> FromData<'a> for Json<T> {
         }
     }
 
-    fn from_data(_: &Request, o: Transformed<'a, Self>) -> Outcome<Self, Self::Error> {
+    fn from_data(_: &Request<'_>, o: Transformed<'a, Self>) -> Outcome<Self, Self::Error> {
         let string = o.borrowed()?;
         match serde_json::from_str(&string) {
             Ok(v) => Success(Json(v)),
@@ -163,8 +161,8 @@ impl<'a, T: Deserialize<'a>> FromData<'a> for Json<T> {
 /// Serializes the wrapped value into JSON. Returns a response with Content-Type
 /// JSON and a fixed-size body with the serialized value. If serialization
 /// fails, an `Err` of `Status::InternalServerError` is returned.
-impl<T: Serialize> Responder<'static> for Json<T> {
-    fn respond_to(self, req: &Request) -> response::Result<'static> {
+impl<'a, T: Serialize> Responder<'a> for Json<T> {
+    fn respond_to(self, req: &Request<'_>) -> response::Result<'a> {
         serde_json::to_string_pretty(&self.0).map(|string| {
             content::Json(string).respond_to(req).unwrap()
         }).map_err(|e| {
@@ -277,11 +275,17 @@ impl From<serde_json::Value> for JsonValue {
     }
 }
 
+impl<T> FromIterator<T> for JsonValue where serde_json::Value: FromIterator<T> {
+    fn from_iter<I: IntoIterator<Item=T>>(iter: I) -> Self {
+        JsonValue(serde_json::Value::from_iter(iter))
+    }
+}
+
 /// Serializes the value into JSON. Returns a response with Content-Type JSON
 /// and a fixed-size body with the serialized value.
 impl<'a> Responder<'a> for JsonValue {
     #[inline]
-    fn respond_to(self, req: &Request) -> response::Result<'a> {
+    fn respond_to(self, req: &Request<'_>) -> response::Result<'a> {
         content::Json(self.0.to_string()).respond_to(req)
     }
 }
